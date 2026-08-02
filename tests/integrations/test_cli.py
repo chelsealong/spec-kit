@@ -116,6 +116,48 @@ class TestInitIntegrationFlag:
         data = json.loads((project / ".specify" / "integration.json").read_text(encoding="utf-8"))
         assert data["integration"] == specify_cli.DEFAULT_INIT_INTEGRATION
 
+    def test_noninteractive_init_honors_default_integration_env_var(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+        from specify_cli import app
+        import specify_cli
+
+        def fail_select(*_args, **_kwargs):
+            raise AssertionError("non-interactive init should not open the integration picker")
+
+        monkeypatch.setattr(specify_cli, "select_with_arrows", fail_select)
+        monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "claude")
+
+        runner = CliRunner()
+        project = tmp_path / "noninteractive-env-default"
+        result = runner.invoke(app, [
+            "init", str(project), "--script", "sh", "--ignore-agent-tools",
+        ], catch_exceptions=False)
+
+        assert result.exit_code == 0, result.output
+        assert "defaulting to 'claude'" in result.output
+
+        data = json.loads((project / ".specify" / "integration.json").read_text(encoding="utf-8"))
+        assert data["integration"] == "claude"
+
+    def test_noninteractive_init_ignores_unknown_default_integration_env_var(self, tmp_path, monkeypatch):
+        from typer.testing import CliRunner
+        from specify_cli import app
+        import specify_cli
+
+        monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "not-a-real-integration")
+
+        runner = CliRunner()
+        project = tmp_path / "noninteractive-env-default-invalid"
+        result = runner.invoke(app, [
+            "init", str(project), "--script", "sh", "--ignore-agent-tools",
+        ], catch_exceptions=False)
+
+        assert result.exit_code == 0, result.output
+        assert f"defaulting to '{specify_cli.DEFAULT_INIT_INTEGRATION}'" in result.output
+
+        data = json.loads((project / ".specify" / "integration.json").read_text(encoding="utf-8"))
+        assert data["integration"] == specify_cli.DEFAULT_INIT_INTEGRATION
+
     def test_init_here_nonempty_noninteractive_errors_with_force_guidance(self, tmp_path):
         """`init --here` on a non-empty directory with no confirmation input (empty
         stdin) must fail fast with guidance to use --force, instead of the bare

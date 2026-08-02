@@ -24,6 +24,33 @@ def test_agent_config_importable():
     assert "sh" in SCRIPT_TYPE_CHOICES
 
 
+def test_get_default_init_integration_honors_env_override(monkeypatch):
+    from specify_cli._agent_config import get_default_init_integration
+
+    monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "claude")
+    assert get_default_init_integration() == "claude"
+
+
+def test_get_default_init_integration_ignores_unknown_env_value(monkeypatch):
+    from specify_cli._agent_config import (
+        DEFAULT_INIT_INTEGRATION,
+        get_default_init_integration,
+    )
+
+    monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "not-a-real-integration")
+    assert get_default_init_integration() == DEFAULT_INIT_INTEGRATION
+
+
+def test_get_default_init_integration_falls_back_when_unset(monkeypatch):
+    from specify_cli._agent_config import (
+        DEFAULT_INIT_INTEGRATION,
+        get_default_init_integration,
+    )
+
+    monkeypatch.delenv("SPECKIT_DEFAULT_INIT_INTEGRATION", raising=False)
+    assert get_default_init_integration() == DEFAULT_INIT_INTEGRATION
+
+
 def test_script_type_choices_includes_python():
     from specify_cli._agent_config import SCRIPT_TYPE_CHOICES
     assert SCRIPT_TYPE_CHOICES.get("py") == "Python"

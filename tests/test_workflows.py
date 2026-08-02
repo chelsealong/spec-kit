@@ -2281,6 +2281,21 @@ class TestInitStep:
         assert result.status == StepStatus.COMPLETED
         assert result.output["integration"] == "copilot"
 
+    def test_default_integration_honors_env_var_when_none_provided(self, tmp_path, monkeypatch):
+        from specify_cli.workflows.steps.init import InitStep
+        from specify_cli.workflows.base import StepContext, StepStatus
+
+        monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "claude")
+        step = InitStep()
+        # No default_integration on context, and no per-step integration either
+        ctx = StepContext(project_root=str(tmp_path))
+        result = step.execute(
+            {"id": "bootstrap", "here": True, "script": "sh"},
+            ctx,
+        )
+        assert result.status == StepStatus.COMPLETED
+        assert result.output["integration"] == "claude"
+
     def test_integration_options_passed_through(self, tmp_path):
         from specify_cli.workflows.steps.init import InitStep
         from specify_cli.workflows.base import StepContext, StepStatus

@@ -11,7 +11,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from specify_cli._agent_config import DEFAULT_INIT_INTEGRATION, SCRIPT_TYPE_CHOICES
+from specify_cli._agent_config import (
+    SCRIPT_TYPE_CHOICES,
+    get_default_init_integration,
+)
 from specify_cli.workflows.base import StepBase, StepContext, StepResult, StepStatus
 from specify_cli.workflows.expressions import evaluate_expression
 
@@ -81,7 +84,7 @@ class InitStep(StepBase):
         # Apply the same default that specify init uses in non-interactive mode
         # so that output.integration reflects the actual integration used.
         if not integration:
-            integration = DEFAULT_INIT_INTEGRATION
+            integration = get_default_init_integration()
 
         integration_options = self._resolve(
             config.get("integration_options"), context

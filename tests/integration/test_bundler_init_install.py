@@ -44,6 +44,17 @@ def test_precedence_default_when_unspecified():
     assert _resolve_init_integration(None, None) == "copilot"
 
 
+def test_precedence_env_default_when_no_override_or_bundle_declared(monkeypatch):
+    monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "gemini")
+    assert _resolve_init_integration(None, None) == "gemini"
+
+
+def test_precedence_bundle_declared_wins_over_env_default(monkeypatch):
+    monkeypatch.setenv("SPECKIT_DEFAULT_INIT_INTEGRATION", "gemini")
+    manifest = _manifest(integration={"id": "claude"})
+    assert _resolve_init_integration(None, manifest) == "claude"
+
+
 def _build_mini(tmp_path: Path) -> Path:
     bundle = tmp_path / "mini"
     bundle.mkdir()
