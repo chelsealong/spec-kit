@@ -10454,3 +10454,33 @@ def test_forge_extension_info_hyphenates_command_names(
     # not the manifest's dotted name.
     assert "speckit-test-ext-hello" in output, output
     assert "speckit.test-ext.hello" not in output, output
+
+
+def test_repository_community_extension_catalog_matches_contract():
+    """The repository's own extensions/catalog.community.json must parse under
+    the same schema guard the CLI applies to a fetched payload, and every entry
+    must declare a valid `effect` and `requires.speckit_version` — including the
+    adrkit submission from issue #3942, which must sit immediately before its
+    alphabetical neighbor "aide" per the contributor guide's ordering rule."""
+    catalog_path = Path(__file__).parents[1] / "extensions" / "catalog.community.json"
+    payload = json.loads(catalog_path.read_text(encoding="utf-8"))
+
+    ExtensionCatalog._validate_catalog_payload(
+        ExtensionCatalog.__new__(ExtensionCatalog), payload, str(catalog_path)
+    )
+
+    extensions = payload["extensions"]
+    ids = list(extensions)
+    assert "adrkit" in extensions
+    assert ids.index("adrkit") == ids.index("aide") - 1
+
+    entry = extensions["adrkit"]
+    assert entry["id"] == "adrkit"
+    assert entry["repository"] == "https://github.com/mbeacom/adrkit"
+    assert entry["license"] == "Apache-2.0"
+    assert entry["provides"] == {"commands": 3, "hooks": 1}
+
+    for ext_id, ext in extensions.items():
+        if "effect" in ext:
+            assert ext["effect"] in VALID_EFFECTS, f"{ext_id} has an invalid effect"
+        assert "speckit_version" in ext["requires"], f"{ext_id} is missing requires.speckit_version"
