@@ -57,6 +57,13 @@ from ..shared_infra import (
 
 _CONSTITUTION_PROVENANCE_FILE = ".constitution-template.json"
 
+# Install/remove-time constitution reseeding is opt-in, gated behind this
+# preset. Without it, constitution-template resolution happens only at
+# init and at /constitution command time, matching how every other
+# template (e.g. spec-template) is resolved on demand rather than
+# materialized as a side effect of preset install/remove.
+_CONSTITUTION_SYNC_PRESET_ID = "constitution-sync"
+
 
 def _content_sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
@@ -3495,7 +3502,9 @@ class PresetManager:
         Only runs when the preset declares a ``type: template`` entry named
         ``constitution-template`` or provides one at a convention path, and the
         live memory file is either missing or is an unchanged generated file.
-        Authored constitutions are never overwritten.
+        Authored constitutions are never overwritten. Actual materialization
+        is further gated in ``_reconcile_constitution`` behind the opt-in
+        ``constitution-sync`` preset.
         """
         provides_constitution = any(
             t.get("type") == "template" and t.get("name") == "constitution-template"
@@ -3530,7 +3539,16 @@ class PresetManager:
             )
 
     def _reconcile_constitution(self, *, create_if_missing: bool = False) -> None:
-        """Materialize the winning constitution layer when the live file is generated."""
+        """Materialize the winning constitution layer when the live file is generated.
+
+        This is the opt-in materialization path: it only runs when the
+        ``constitution-sync`` preset is installed. Without it, preset
+        install/remove and priority/enable/disable changes leave the live
+        constitution alone; only init (a one-time seed) and the
+        /constitution command resolve constitution-template content.
+        """
+        if not self.registry.is_installed(_CONSTITUTION_SYNC_PRESET_ID):
+            return
         memory_constitution = (
             self.project_root / ".specify" / "memory" / "constitution.md"
         )

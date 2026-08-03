@@ -3300,6 +3300,21 @@ CORE_TEMPLATE_NAMES = [
 ]
 
 
+CONSTITUTION_SYNC_PRESET_DIR = Path(__file__).parent.parent / "presets" / "constitution-sync"
+
+
+def install_constitution_sync_preset(
+    manager: PresetManager, speckit_version: str = "0.15.0"
+) -> PresetManifest:
+    """Install the bundled opt-in constitution-sync preset.
+
+    Install/remove-time constitution reseeding only fires when this preset
+    is installed; tests exercising that materialization path must install
+    it first.
+    """
+    return manager.install_from_directory(CONSTITUTION_SYNC_PRESET_DIR, speckit_version)
+
+
 def install_self_test_preset(manager: PresetManager, speckit_version: str = "0.1.5") -> PresetManifest:
     """Install self-test while filtering its intentionally missing wrap base."""
     with warnings.catch_warnings():
@@ -3444,6 +3459,7 @@ class TestSelfTestPreset:
             (templates_dir / f"{name}.md").write_text(f"# Core {name}\n")
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
         manager.remove("self-test")
 
@@ -3462,6 +3478,7 @@ class TestSelfTestPreset:
         (templates_dir / "constitution-template.md").write_text("# Core Constitution\n")
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
         memory = project_dir / ".specify" / "memory" / "constitution.md"
         edited = memory.read_text() + "\n## Authored amendment\n"
@@ -3546,14 +3563,28 @@ class TestSelfTestPreset:
         assert metadata["registered_commands"] == {}
 
     def test_self_test_seeds_constitution_when_memory_absent(self, project_dir):
-        """Installing a preset seeds memory/constitution.md from its template."""
+        """Installing a preset seeds memory/constitution.md from its template
+        when constitution-sync (the opt-in for install-time seeding) is installed."""
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         memory = project_dir / ".specify" / "memory" / "constitution.md"
         assert memory.exists(), "constitution.md was not seeded from the preset"
         assert "preset:self-test" in memory.read_text(), (
             "constitution.md was not seeded from the self-test preset template"
+        )
+
+    def test_self_test_install_does_not_seed_constitution_by_default(
+        self, project_dir
+    ):
+        """Without constitution-sync installed, install-time seeding is skipped."""
+        manager = PresetManager(project_dir)
+        install_self_test_preset(manager)
+
+        memory = project_dir / ".specify" / "memory" / "constitution.md"
+        assert not memory.exists(), (
+            "constitution.md must not be seeded at install time by default"
         )
 
     def test_self_test_reseeds_exact_core_constitution(self, project_dir):
@@ -3569,6 +3600,7 @@ class TestSelfTestPreset:
         memory.write_bytes(core)
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         content = memory.read_text()
@@ -3601,6 +3633,7 @@ class TestSelfTestPreset:
         original = memory.read_bytes()
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         assert memory.read_bytes() == original
@@ -3617,6 +3650,7 @@ class TestSelfTestPreset:
         memory.write_text(authored)
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         assert memory.read_text() == authored
@@ -3663,7 +3697,9 @@ class TestSelfTestPreset:
             )
         )
 
-        PresetManager(project_dir).install_from_directory(preset_dir, "0.1.5")
+        manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
+        manager.install_from_directory(preset_dir, "0.1.5")
 
         assert memory.read_text() == authored
         assert not (memory.parent / ".constitution-template.json").exists()
@@ -3678,6 +3714,7 @@ class TestSelfTestPreset:
         memory.write_text(authored)
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         assert memory.read_text() == authored
@@ -3690,6 +3727,7 @@ class TestSelfTestPreset:
         memory.write_text(authored)
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         assert memory.read_text() == authored, "authored constitution was overwritten"
@@ -3747,6 +3785,7 @@ class TestSelfTestPreset:
         )
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         manager.install_from_directory(preset_dir, "0.1.5")
 
         memory = project_dir / ".specify" / "memory" / "constitution.md"
@@ -3760,6 +3799,7 @@ class TestSelfTestPreset:
     ):
         """An unchanged generated constitution follows priority and fallback layers."""
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         preset_dir = temp_dir / "higher-priority"
@@ -3807,6 +3847,7 @@ class TestSelfTestPreset:
     ):
         """Removing a convention layer rematerializes the remaining resolver layer."""
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
         manager.install_from_directory(
             _make_convention_constitution_preset(temp_dir), "0.1.5", priority=1
@@ -3828,6 +3869,7 @@ class TestSelfTestPreset:
         templates_dir = project_dir / ".specify" / "templates"
         (templates_dir / "constitution-template.md").write_text("# Core Constitution\n")
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         manager.install_from_directory(
             _make_convention_constitution_preset(temp_dir), "0.1.5"
         )
@@ -3845,6 +3887,7 @@ class TestSelfTestPreset:
     ):
         """Provenance triggers fallback when a custom-path manifest is invalid."""
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
 
         preset_dir = temp_dir / "custom-constitution"
@@ -3904,6 +3947,7 @@ class TestSelfTestPreset:
             pytest.skip("symlinks are unavailable")
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         with pytest.warns(UserWarning, match="symlinked"):
             install_self_test_preset(manager)
 
@@ -3923,6 +3967,7 @@ class TestSelfTestPreset:
             pytest.skip("symlinks are unavailable")
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         with pytest.warns(UserWarning, match="symlinked"):
             install_self_test_preset(manager)
 
@@ -3965,6 +4010,7 @@ class TestSelfTestPreset:
         )
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         with pytest.warns(UserWarning, match="Failed to seed constitution"):
             manifest = manager.install_from_directory(preset_dir, "0.1.5")
 
@@ -9364,6 +9410,7 @@ class TestPresetSetPriority:
         from specify_cli import app
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
         manager.install_from_directory(
             _make_convention_constitution_preset(temp_dir), "0.1.5", priority=20
@@ -9609,6 +9656,7 @@ class TestPresetEnableDisable:
         from specify_cli import app
 
         manager = PresetManager(project_dir)
+        install_constitution_sync_preset(manager)
         install_self_test_preset(manager)
         manager.install_from_directory(
             _make_convention_constitution_preset(temp_dir), "0.1.5", priority=1
@@ -12092,10 +12140,11 @@ class TestEnsureConstitutionResolverAware:
         manager = PresetManager(project_dir)
         install_self_test_preset(manager)
 
-        # Remove the memory file seeded during install to test ensure() in
-        # isolation; it must re-seed from the preset, not the core template.
+        # Install-time seeding is opt-in (constitution-sync), so memory is
+        # never created by install here; ensure() must seed it from the
+        # preset directly, not the core template.
         memory = project_dir / ".specify" / "memory" / "constitution.md"
-        memory.unlink()
+        memory.unlink(missing_ok=True)
 
         ensure_constitution_from_template(project_dir)
 
@@ -12140,7 +12189,7 @@ class TestEnsureConstitutionResolverAware:
 
         # Ensure we validate ensure() behavior directly.
         memory = project_dir / ".specify" / "memory" / "constitution.md"
-        memory.unlink()
+        memory.unlink(missing_ok=True)
         ensure_constitution_from_template(project_dir)
 
         content = memory.read_text()
