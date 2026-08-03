@@ -36,6 +36,13 @@ appends a propagation pass that, after the constitution is written:
 - Updates **project-local** command files and guidance docs to correct stale references.
 - Extends the Sync Impact Report in `.specify/memory/constitution.md` with the files it touched.
 
+It also gates a second, install-time behavior: when another installed preset ships its own
+`constitution-template` (e.g. a `replace`-strategy ratified constitution, or a category preset
+composing `append`/`wrap` layers), installing/removing/reordering that preset re-materializes
+`.specify/memory/constitution.md` from the winning layer **only while this preset is installed**.
+Without it, `constitution-template` is left alone after the one-time seed at project init, and is
+resolved again only when `/constitution` runs — the same on-demand model every other template uses.
+
 ## What it does not do
 
 - It does **not** change behavior for anyone who does not install it — the default runtime
