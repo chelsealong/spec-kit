@@ -635,6 +635,21 @@ def register(app: typer.Typer) -> None:
                 )
                 manifest.save()
 
+                # setup() just regenerated core-template skill/command files,
+                # which wipes out any preset composition applied on a prior
+                # run. Re-apply previously-enabled presets on top so
+                # `--here --force` stays in sync with the preset registry
+                # instead of silently reverting to pristine core content
+                # (mirrors what `integration upgrade` already does for its
+                # active integration). No-op when no presets are enabled.
+                from ..integrations._helpers import _register_presets_for_agent
+
+                _register_presets_for_agent(
+                    project_path,
+                    resolved_integration.key,
+                    continuing="Installed presets may need re-registration.",
+                )
+
                 integration_settings = _with_integration_setting(
                     {},
                     resolved_integration.key,

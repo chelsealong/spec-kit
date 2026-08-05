@@ -4078,6 +4078,76 @@ class TestIntegrationUpgrade:
         assert result.exit_code == 0, result.output
         assert "Preset upgrade body" in skill_file.read_text(encoding="utf-8")
 
+    def test_init_here_force_reregisters_presets(self, tmp_path):
+        """`init --here --force` restores preset composition, not just core.
+
+        Regression for #3990: a preset that *wraps* an existing core command
+        (e.g. ``speckit.specify``) composes its content into that command's
+        skill file. `setup()` unconditionally regenerates every core-template
+        skill file from the bundled core, which previously reverted this
+        composed content back to pristine core with no warning, even though
+        the preset registry kept reporting the preset as installed/enabled.
+        A preset that only adds a brand-new command (never part of core)
+        would not catch this, since `setup()` never touches non-core files.
+        """
+        import yaml
+
+        project = _init_project(tmp_path, "claude")
+        preset_src = tmp_path / "demo-wrap"
+        (preset_src / "commands").mkdir(parents=True)
+        (preset_src / "commands" / "speckit.specify.md").write_text(
+            "---\ndescription: Wrapped speckit.specify\nstrategy: wrap\n---\n\n"
+            "<!-- demo preamble -->\n\n{CORE_TEMPLATE}\n",
+            encoding="utf-8",
+        )
+        manifest = {
+            "schema_version": "1.0",
+            "preset": {
+                "id": "demo-wrap",
+                "name": "Demo Wrap",
+                "version": "1.0.0",
+                "description": "Wraps speckit.specify with a preamble",
+                "author": "demo",
+                "license": "MIT",
+            },
+            "requires": {"speckit_version": ">=0.1.0"},
+            "provides": {
+                "templates": [
+                    {
+                        "type": "command",
+                        "name": "speckit.specify",
+                        "file": "commands/speckit.specify.md",
+                        "description": "Wrap speckit.specify with a preamble",
+                        "strategy": "wrap",
+                    }
+                ]
+            },
+        }
+        (preset_src / "preset.yml").write_text(
+            yaml.dump(manifest), encoding="utf-8"
+        )
+
+        result = _run_in_project(
+            project, ["preset", "add", "--dev", str(preset_src)]
+        )
+        assert result.exit_code == 0, result.output
+
+        skill_file = project / ".claude" / "skills" / "speckit-specify" / "SKILL.md"
+        assert "demo preamble" in skill_file.read_text(encoding="utf-8")
+
+        result = _run_in_project(project, [
+            "init", "--here",
+            "--integration", "claude",
+            "--script", "sh",
+            "--ignore-agent-tools",
+            "--force",
+        ])
+        assert result.exit_code == 0, result.output
+        assert "demo preamble" in skill_file.read_text(encoding="utf-8"), (
+            "init --here --force must reapply installed presets, not leave "
+            "the on-disk skill reverted to pristine core content"
+        )
+
     def test_upgrade_non_active_agent_preserves_active_agent_skills(self, tmp_path):
         """Upgrading a non-active agent must not touch the active agent's skills.
 
