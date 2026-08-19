@@ -410,6 +410,17 @@ class TestResolveCommandRefs:
         result = IntegrationBase.resolve_command_refs(text, ".")
         assert result == "/speckit.v2.plan"
 
+    def test_hyphenated_segment_dot_separator(self):
+        """A double underscore escapes a literal hyphen within a segment."""
+        text = "__SPECKIT_COMMAND_AGENT__CONTEXT_UPDATE__"
+        result = IntegrationBase.resolve_command_refs(text, ".")
+        assert result == "/speckit.agent-context.update"
+
+    def test_hyphenated_segment_hyphen_separator(self):
+        text = "__SPECKIT_COMMAND_AGENT__CONTEXT_UPDATE__"
+        result = IntegrationBase.resolve_command_refs(text, "-")
+        assert result == "/speckit-agent-context-update"
+
 
 class TestResolvePythonInterpreter:
     def test_returns_python_on_path(self, monkeypatch):

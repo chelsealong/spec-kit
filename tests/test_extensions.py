@@ -3714,6 +3714,32 @@ Real body starts here.
         assert "$speckit-plan" in content
         assert "/speckit-plan" not in content
 
+    def test_codex_skill_registration_resolves_hyphenated_command_ref(
+        self, extension_dir, project_dir
+    ):
+        """A command whose name has a hyphenated segment (e.g. the bundled
+        agent-context extension's `speckit.agent-context.update`) must
+        resolve correctly through the escaped __SPECKIT_COMMAND_<NAME>__
+        token instead of the hyphen being misread as a segment separator."""
+        skills_dir = project_dir / ".agents" / "skills"
+        skills_dir.mkdir(parents=True)
+        command = extension_dir / "commands" / "hello.md"
+        command.write_text(
+            "---\ndescription: Test hello command\n---\n\n"
+            "Run __SPECKIT_COMMAND_TEST__EXT_HELLO__.",
+            encoding="utf-8",
+        )
+
+        manifest = ExtensionManifest(extension_dir / "extension.yml")
+        registrar = CommandRegistrar()
+        registrar.register_commands_for_agent(
+            "codex", manifest, extension_dir, project_dir
+        )
+
+        skill_file = skills_dir / "speckit-test-ext-hello" / "SKILL.md"
+        content = skill_file.read_text(encoding="utf-8")
+        assert "$speckit-test-ext-hello" in content
+
     def test_codex_skill_registration_resolves_script_placeholders(self, project_dir, temp_dir):
         """Codex SKILL.md overrides should resolve script placeholders."""
         import yaml

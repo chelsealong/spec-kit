@@ -617,6 +617,18 @@ class IntegrationBase(ABC):
         return created
 
     @staticmethod
+    def decode_command_token(name: str) -> str:
+        """Decode a placeholder body into a dotted, lower-case command name.
+
+        A single underscore separates dotted segments (e.g. ``GIT_COMMIT``
+        -> ``git.commit``). A double underscore escapes a literal hyphen
+        within a segment (e.g. ``AGENT__CONTEXT_UPDATE`` ->
+        ``agent-context.update``), since command names may themselves
+        contain hyphens (``speckit.agent-context.update``).
+        """
+        return "-".join(name.split("__")).replace("_", ".").lower()
+
+    @staticmethod
     def resolve_command_refs(
         content: str, separator: str = ".", prefix: str = "/"
     ) -> str:
@@ -630,6 +642,11 @@ class IntegrationBase(ABC):
         * ``separator="."`` → ``/speckit.plan``, ``/speckit.git.commit``
         * ``separator="-"`` → ``/speckit-plan``, ``/speckit-git-commit``
 
+        A double underscore escapes a literal hyphen within a segment, so
+        ``__SPECKIT_COMMAND_AGENT__CONTEXT_UPDATE__`` resolves to
+        ``/speckit.agent-context.update`` (dot separator) or
+        ``/speckit-agent-context-update`` (hyphen separator).
+
         *prefix* defaults to ``"/"`` but may be ``"$"`` for agents whose
         native skills invocation uses dollar-prefixed chat commands.
         """
@@ -638,7 +655,9 @@ class IntegrationBase(ABC):
             lambda m: prefix
             + "speckit"
             + separator
-            + m.group(1).lower().replace("_", separator),
+            + IntegrationBase.decode_command_token(m.group(1)).replace(
+                ".", separator
+            ),
             content,
         )
 

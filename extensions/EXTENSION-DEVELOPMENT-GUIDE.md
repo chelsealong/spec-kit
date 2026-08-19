@@ -304,7 +304,7 @@ Encode the command name in upper case, dropping the `speckit.` prefix and turnin
 | `speckit.bug.fix.md` | `__SPECKIT_COMMAND_BUG_FIX__` |
 | `speckit.git.commit.md` | `__SPECKIT_COMMAND_GIT_COMMIT__` |
 
-The resolver maps each underscore back to the active agent's separator, so use tokens to reference commands whose name segments are single words. (Command names are dotted segments like `git.commit`; the token scheme rebuilds those dots and does not carry hyphens within a segment.)
+The resolver maps each single underscore back to the active agent's separator. If a segment itself contains a hyphen (command names may, e.g. `agent-context`), escape it with a *double* underscore so it survives the round trip: `speckit.agent-context.update` → `__SPECKIT_COMMAND_AGENT__CONTEXT_UPDATE__`.
 
 **Example** — a command body that points the user at the next step:
 

@@ -1580,7 +1580,9 @@ class ExtensionManager:
             """Resolve explicit command-ref tokens with the active skill style."""
 
             def _replacement(match: re.Match[str]) -> str:
-                command_name = "speckit." + match.group(1).lower().replace("_", ".")
+                command_name = "speckit." + IntegrationBase.decode_command_token(
+                    match.group(1)
+                )
                 if is_dollar_skills_agent(selected_ai, ai_skills_enabled):
                     return "$" + command_name.replace("speckit.", "speckit-").replace(
                         ".", "-"
