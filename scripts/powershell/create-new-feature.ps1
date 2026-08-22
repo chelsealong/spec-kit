@@ -268,7 +268,38 @@ if (-not $DryRun) {
         $content = Resolve-TemplateContent -TemplateName 'spec-template' -RepoRoot $repoRoot
     }
 
-    New-Item -ItemType Directory -Path $featureDir -Force | Out-Null
+    # Reserve the feature directory exclusively (no -Force) so two concurrent
+    # invocations can never both succeed for the same number. If another
+    # invocation wins the race, rescan and retry with the next number instead
+    # of silently sharing (and overwriting) its spec directory. A fresh
+    # reservation always needs its spec file written, since nothing could
+    # have created one there before us.
+    if (-not ($AllowExistingBranch -and (Test-Path -LiteralPath $featureDir -PathType Container))) {
+        while ($true) {
+            try {
+                New-Item -ItemType Directory -Path $featureDir -ErrorAction Stop | Out-Null
+                break
+            } catch [System.IO.IOException] {
+                if (-not (Test-Path -LiteralPath $featureDir -PathType Container)) {
+                    throw
+                }
+                if ($Timestamp) {
+                    Write-Error "Error: Feature directory '$featureDir' already exists. Rerun to get a new timestamp or use a different -ShortName."
+                    exit 1
+                }
+                $highestNumber = Get-HighestNumberFromSpecs -SpecsDir $specsDir
+                if ($highestNumber -eq [long]::MaxValue) {
+                    Write-Error "Error: feature number must be between 0 and $([long]::MaxValue), got '9223372036854775808'"
+                    exit 1
+                }
+                $featureNum = ('{0:000}' -f ($highestNumber + 1))
+                $branchName = Get-FittedBranchName -FeatureNum $featureNum -BranchSuffix $branchSuffix
+                $featureDir = Join-Path $specsDir $branchName
+                $specFile = Join-Path $featureDir 'spec.md'
+                $needsSpec = $true
+            }
+        }
+    }
 
     if ($needsSpec) {
         if ($null -ne $content) {

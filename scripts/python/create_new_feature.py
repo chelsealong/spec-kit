@@ -394,7 +394,39 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Error: {exc}", file=sys.stderr)
                 return 1
 
-        feature_dir.mkdir(parents=True, exist_ok=True)
+        # Reserve the feature directory exclusively (exist_ok=False) so two
+        # concurrent invocations can never both succeed for the same number.
+        # If another invocation wins the race, rescan and retry with the next
+        # number instead of silently sharing (and overwriting) its spec
+        # directory. A fresh reservation always needs its spec file written,
+        # since nothing could have created one there before us.
+        if not (args.allow_existing and feature_dir.is_dir()):
+            while True:
+                try:
+                    feature_dir.mkdir(parents=True, exist_ok=False)
+                    break
+                except FileExistsError:
+                    if args.use_timestamp:
+                        print(
+                            f"Error: Feature directory '{feature_dir}' already "
+                            "exists. Rerun to get a new timestamp or use a "
+                            "different --short-name.",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    number = _get_highest_from_specs(specs_dir) + 1
+                    if number > _MAX_FEATURE_NUMBER:
+                        print(
+                            "Error: feature number must be between 0 and "
+                            f"{_MAX_FEATURE_NUMBER}, got '{number}'",
+                            file=sys.stderr,
+                        )
+                        return 1
+                    feature_num = f"{number:03d}"
+                    branch_name = _fit_branch_name(feature_num, branch_suffix)
+                    feature_dir = specs_dir / branch_name
+                    spec_file = feature_dir / "spec.md"
+                    needs_spec = True
 
         if needs_spec:
             if template_content is not None:

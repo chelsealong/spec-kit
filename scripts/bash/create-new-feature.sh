@@ -355,7 +355,37 @@ if [ "$DRY_RUN" != true ]; then
         fi
     fi
 
-    mkdir -p "$FEATURE_DIR"
+    # Reserve the feature directory exclusively (plain mkdir, no -p) so two
+    # concurrent invocations can never both succeed for the same number. If
+    # another invocation wins the race, rescan and retry with the next number
+    # instead of silently sharing (and overwriting) its spec directory. A
+    # fresh reservation always needs its spec file written, since nothing
+    # could have created one there before us.
+    if [ "$ALLOW_EXISTING" = true ] && [ -d "$FEATURE_DIR" ]; then
+        : # Reusing an existing feature directory is intentional, not a race.
+    else
+        while ! mkdir "$FEATURE_DIR" 2>/dev/null; do
+            if [ ! -d "$FEATURE_DIR" ]; then
+                >&2 echo "Error: failed to create feature directory '$FEATURE_DIR'"
+                exit 1
+            fi
+            if [ "$USE_TIMESTAMP" = true ]; then
+                >&2 echo "Error: Feature directory '$FEATURE_DIR' already exists. Rerun to get a new timestamp or use a different --short-name."
+                exit 1
+            fi
+            HIGHEST=$(get_highest_from_specs "$SPECS_DIR")
+            if [ "$HIGHEST" -eq "$MAX_FEATURE_NUMBER" ]; then
+                echo "Error: feature number must be between 0 and $MAX_FEATURE_NUMBER, got '9223372036854775808'" >&2
+                exit 1
+            fi
+            BRANCH_NUMBER=$((HIGHEST + 1))
+            FEATURE_NUM=$(printf "%03d" "$((10#$BRANCH_NUMBER))")
+            BRANCH_NAME=$(fit_branch_name "$FEATURE_NUM" "$BRANCH_SUFFIX")
+            FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
+            SPEC_FILE="$FEATURE_DIR/spec.md"
+            NEEDS_SPEC=true
+        done
+    fi
 
     if [ "$NEEDS_SPEC" = true ]; then
         if [ "$SPEC_TEMPLATE_FOUND" = true ]; then
