@@ -61,38 +61,40 @@ class TestAgyBuildExecArgs:
     """agy non-interactive execution argument building."""
 
     def test_build_exec_args_returns_print_command(self):
-        """build_exec_args should return ['agy', '--print', prompt]."""
+        """build_exec_args should return ['agy', '--add-dir', '.', '--print', prompt]."""
         from specify_cli.integrations import get_integration
         i = get_integration("agy")
         result = i.build_exec_args("describe my feature")
-        assert result == ["agy", "--print", "describe my feature"]
+        assert result == ["agy", "--add-dir", ".", "--print", "describe my feature"]
 
-    def test_build_exec_args_ignores_model(self):
-        """agy does not support --model; model param must be ignored."""
+    def test_build_exec_args_supports_model(self):
+        """agy supports --model; it must be passed before --print."""
         from specify_cli.integrations import get_integration
         i = get_integration("agy")
         result = i.build_exec_args("my prompt", model="gemini-pro")
-        assert result == ["agy", "--print", "my prompt"]
+        assert result == [
+            "agy", "--model", "gemini-pro", "--add-dir", ".", "--print", "my prompt",
+        ]
 
     def test_build_exec_args_ignores_output_json(self):
         """agy does not support JSON output; output_json param must be ignored."""
         from specify_cli.integrations import get_integration
         i = get_integration("agy")
         result = i.build_exec_args("my prompt", output_json=False)
-        assert result == ["agy", "--print", "my prompt"]
+        assert result == ["agy", "--add-dir", ".", "--print", "my prompt"]
 
     def test_build_exec_args_honors_extra_args(self, monkeypatch):
-        """SPECKIT_INTEGRATION_AGY_EXTRA_ARGS must be appended after the prompt.
+        """SPECKIT_INTEGRATION_AGY_EXTRA_ARGS must precede --print.
 
-        agy previously skipped _apply_extra_args_env_var entirely, so the
-        documented per-integration extra-args hook was silently ignored
-        (same class as the merged cursor-agent fix #3265).
+        Flags appended after --print are folded into the positional
+        prompt text by agy's CLI parser instead of being treated as
+        flags, so they must come before --print like --model/--add-dir.
         """
         from specify_cli.integrations import get_integration
         monkeypatch.setenv("SPECKIT_INTEGRATION_AGY_EXTRA_ARGS", "--verbose")
         i = get_integration("agy")
         assert i.build_exec_args("my prompt") == [
-            "agy", "--print", "my prompt", "--verbose",
+            "agy", "--add-dir", ".", "--verbose", "--print", "my prompt",
         ]
 
     def test_build_exec_args_honors_executable_override(self, monkeypatch):

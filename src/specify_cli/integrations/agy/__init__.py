@@ -88,11 +88,20 @@ class AgyIntegration(SkillsIntegration):
         model: str | None = None,
         output_json: bool = True,
     ) -> list[str] | None:
-        # agy does not support --model or JSON output; both params are ignored
-        args = [self._resolve_executable(), "--print", prompt]
-        # Honor SPECKIT_INTEGRATION_AGY_EXTRA_ARGS (operator-supplied flags),
-        # appended after the positional prompt like the devin integration.
+        # agy does not support JSON output; output_json is ignored. Flags
+        # (--model, --add-dir, extra args) must precede --print, or agy's
+        # CLI parser folds them into the positional prompt text instead
+        # of treating them as flags.
+        args = [self._resolve_executable()]
+        if model:
+            args.extend(["--model", model])
+        # dispatch_command() always runs agy with cwd set to project_root,
+        # so "." resolves to the project directory. Without --add-dir, agy
+        # reports "You do not currently have an active workspace open" in
+        # headless --print mode.
+        args.extend(["--add-dir", "."])
         self._apply_extra_args_env_var(args)
+        args.extend(["--print", prompt])
         return args
 
     def setup(
